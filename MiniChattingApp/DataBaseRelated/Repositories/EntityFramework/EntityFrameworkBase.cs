@@ -36,7 +36,7 @@ namespace MiniChattingApp.DataBaseRelated.Repositories.EntityFramework
 
         }
 
-        public async Task<List<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>> filter = null)
+        public async Task<List<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>> filter = null!)
         {
             return filter == null ? await _context.Set<TEntity>().ToListAsync()
                 : await _context.Set<TEntity>().Where(filter).ToListAsync();

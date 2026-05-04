@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using MiniChattingApp.DataBaseRelated.Entities.Concrete;
-using MiniChattingApp.Entities.Concrete.Mapping;
+using MiniChattingApp.DataBaseRelated.Entities.Concrete.Mapping;
 using System;
 using System.Collections.Generic;
 using System.Linq;

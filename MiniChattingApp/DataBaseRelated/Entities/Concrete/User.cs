@@ -14,7 +14,7 @@ namespace MiniChattingApp.DataBaseRelated.Entities.Concrete
         public string? Email { get; set; }
         public bool IsVerified { get; set; }
         public bool IsOnline { get; set; }
-
+        public DateTime? OfflineSince { get; set; }
         public List<Message>? SentMessages { get; set; }
         public List<Message>? ReceivedMessages { get; set; }
 
