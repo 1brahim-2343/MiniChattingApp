@@ -22,7 +22,8 @@ namespace MiniChattingApp.DataBaseRelated.Entities.Concrete.Mapping
                 .IsRequired();
             builder.Property(f => f.ReceiverId)
                 .IsRequired();
-
+            builder.Property(f => f.Type)
+                .HasDefaultValue("fileMessage");
         }
     }
 }

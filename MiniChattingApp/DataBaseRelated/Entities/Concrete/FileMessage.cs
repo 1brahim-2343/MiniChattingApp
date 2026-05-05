@@ -10,12 +10,14 @@ namespace MiniChattingApp.DataBaseRelated.Entities.Concrete
     public class FileMessage :IEntity
     {
         public int Id { get; set; }
+        public string? Type { get; set; } = "fileMessage";
+
         public string? Path { get; set; }
 
         public int SenderId { get; set; }
-        public User? SenderUser { get; set; }
+        public virtual User? Sender { get; set; }
 
         public int ReceiverId{ get; set; }
-        public User? ReceiverUser { get; set; }
+        public virtual User? Receiver { get; set; }
     }
 }

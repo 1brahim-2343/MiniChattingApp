@@ -22,6 +22,9 @@ namespace MiniChattingApp.DataBaseRelated.Entities.Concrete.Mapping
                 .IsRequired();
             builder.Property(m => m.SenderId)
                 .IsRequired();
+            builder.Property(m => m.Type)
+                .HasDefaultValue("message");
+           
         }
     }
 }

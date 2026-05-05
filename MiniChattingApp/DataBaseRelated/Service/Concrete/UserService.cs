@@ -1,6 +1,7 @@
 ﻿using MiniChattingApp.DataBaseRelated.DataAccess.Abstraction;
 using MiniChattingApp.DataBaseRelated.Entities.Concrete;
 using MiniChattingApp.DataBaseRelated.Service.Abstract;
+using MiniChattingApp.Helpers;
 using MiniChattingApp.Helpers.Exceptions;
 using System;
 using System.Collections.Generic;
@@ -29,7 +30,7 @@ namespace MiniChattingApp.DataBaseRelated.Service.Concrete
                 throw new RequiredFieldException("Username is required");
             var existing = _userDal.GetAsync(e => e.Email == entity.Email);
             if (existing != null)
-                throw new DuplicateEntityException($"This entity already exists, Username: {entity.Username}");
+                throw new DuplicateEntityException($"This user already exists, Username: {entity.Username}, Email: {entity.Email}");
             return await _userDal.AddAsync(entity);
         }
 
@@ -64,6 +65,26 @@ namespace MiniChattingApp.DataBaseRelated.Service.Concrete
             if (entity == null)
                 throw new ArgumentNullException("Pass entity");
             return await _userDal.UpdateAsync(entity);
+        }
+
+        public async Task<bool> UpdateUserStatusAsync(string email, bool isOnline)
+        {
+            User existing = null!;
+            try
+            {
+
+                existing = await GetUserAsync(u => u.Email == email)!;
+            }
+            catch (Exception ex)
+            {
+                ex.Message.ShowErrorMessage();
+            }
+            if (existing == null)
+                throw new NotFoundException("User not found, aborting update user status");
+
+            var result = await _userDal.UpdateUserStatusAsync(existing.Id, isOnline);
+            return result;
+
         }
     }
 }

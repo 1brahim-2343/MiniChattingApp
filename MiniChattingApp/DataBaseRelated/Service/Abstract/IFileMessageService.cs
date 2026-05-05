@@ -10,8 +10,8 @@ namespace MiniChattingApp.DataBaseRelated.Service.Abstract
 {
     public interface IFileMessageService
     {
-        Task<FileMessage> GetFileMessageAsync(Expression<Func<FileMessage, bool>> filter);
-        Task<List<FileMessage>> GetFileMessagesAsync(Expression<Func<FileMessage, bool>> filter = null!);
+        Task<FileMessage>? GetFileMessageAsync(Expression<Func<FileMessage, bool>> filter);
+        Task<List<FileMessage>>? GetFileMessagesAsync(Expression<Func<FileMessage, bool>> filter = null!);
         Task<FileMessage> AddFileMessageAsync(FileMessage entity);
         Task<FileMessage> UpdateFileMessage(FileMessage entity);
         Task<bool> DeleteFileMessage(FileMessage entity);

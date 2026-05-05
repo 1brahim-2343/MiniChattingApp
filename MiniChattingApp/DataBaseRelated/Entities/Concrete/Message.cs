@@ -10,14 +10,16 @@ namespace MiniChattingApp.DataBaseRelated.Entities.Concrete
     public class Message : IEntity
     {
         public int Id { get; set; }
+        public string? Type { get; set; } = "message";
+
         public string? Content { get; set; }
         public bool IsRead { get; set; }
 
         public int SenderId { get; set; }
-        public User? SenderUser { get; set; }
+        public virtual User? Sender { get; set; }
 
         public int ReceiverId { get; set; }
-        public User? ReceiverUser { get; set; }
+        public virtual User? Receiver { get; set; }
 
     }
 }

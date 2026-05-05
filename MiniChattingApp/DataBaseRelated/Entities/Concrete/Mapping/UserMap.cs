@@ -19,26 +19,33 @@ namespace MiniChattingApp.DataBaseRelated.Entities.Concrete.Mapping
 
             builder.Property(u => u.Email)
                 .IsRequired();
+            builder.Property(u => u.Type)
+                .HasDefaultValue("user");
 
             builder.Property(u => u.Username)
                 .IsRequired();
 
             builder.HasMany(u => u.SentMessages)
-                .WithOne(m => m.SenderUser)
-                .HasForeignKey(m=>m.SenderId);
+                .WithOne(m => m.Sender)
+                .HasForeignKey(m=>m.SenderId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasMany(u => u.ReceivedMessages)
-                .WithOne(m => m.ReceiverUser)
-                .HasForeignKey(m => m.ReceiverUser);
+                .WithOne(m => m.Receiver)
+                .HasForeignKey(m => m.ReceiverId)
+                .OnDelete(DeleteBehavior.Restrict);
 
 
             builder.HasMany(u => u.SentFiles)
-                .WithOne(f => f.SenderUser)
-                .HasForeignKey(f => f.SenderId);
+                .WithOne(f => f.Sender)
+                .HasForeignKey(f => f.SenderId)
+                .OnDelete(DeleteBehavior.NoAction)
+                ;
 
             builder.HasMany(u => u.ReceivedFiles)
-                .WithOne(f => f.ReceiverUser)
-                .HasForeignKey(f => f.ReceiverId);
+                .WithOne(f => f.Receiver)
+                .HasForeignKey(f => f.ReceiverId)
+                .OnDelete(DeleteBehavior.NoAction);
 
         }
     }
