@@ -29,6 +29,7 @@ namespace MiniChattingApp.Helpers
         public static EFMessageDal? MessageDal { get; set; }
         public static UserService? UserService { get; set; }
         public static List<User>? Users { get; set; }
+        //consider creating static list messages, if added use everywhere 
 
         static List<TcpClient> _tcpClients = [];
 
@@ -101,8 +102,8 @@ namespace MiniChattingApp.Helpers
                 _tcpClients.Add(tcpClient);
 
                 var bw = new BinaryWriter(stream);
-                var json = JsonConvert.SerializeObject(Users);
-                bw.Write(json);
+                string json = null!;
+                //bw.Write(json);
 
                 while (true)
                 {
@@ -117,15 +118,16 @@ namespace MiniChattingApp.Helpers
 
                         await StartChat(senderEmail!, content!, receiverEmail!);
                     }
-                    else    if (msg == "_users")
+                    else if (msg == "_users")
                     {
+                        Users = await UserDal.GetAllAsync();
                         bw = new BinaryWriter(stream);
                         json = JsonConvert.SerializeObject(Users);
                         bw.Write(json);
                     }
                     else if (msg == "_chatHistory")
                     {
-                        var messages = MessageDal!.GetAllAsync();
+                        var messages = await MessageDal!.GetAllAsync();
                         json = JsonConvert.SerializeObject(messages);
                         bw.Write(json);
                     }
