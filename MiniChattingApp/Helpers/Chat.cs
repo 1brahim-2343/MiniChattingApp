@@ -8,8 +8,11 @@ namespace MiniChattingApp.Helpers
 {
     internal class Chat
     {
+        public string? Type { get; set; } = "chat";
         public string? SenderEmail { get; set; }
         public string? Content { get; set; }
         public string? ReceiverEmail { get; set; }
+        public DateTime SendingTime { get; set; }
+
     }
 }

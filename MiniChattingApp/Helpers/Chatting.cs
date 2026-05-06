@@ -10,6 +10,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace MiniChattingApp.Helpers
@@ -28,8 +29,12 @@ namespace MiniChattingApp.Helpers
         public static EFUserDal? UserDal { get; set; }
         public static EFMessageDal? MessageDal { get; set; }
         public static UserService? UserService { get; set; }
+        public static List<FileMessage>? FileMessages { get; set; }
+        public static EFFileMessageDal? FileMessageDal { get; set; }
         public static List<User>? Users { get; set; }
         //consider creating static list messages, if added use everywhere 
+        private const string SaveFolder = "ReceivedFiles";
+
 
         static List<TcpClient> _tcpClients = [];
 
@@ -111,12 +116,47 @@ namespace MiniChattingApp.Helpers
                     //Console.Write($"User \"{username}\": ", Console.ForegroundColor = ConsoleColor.Yellow);
                     if (Helper.IsValidJson(msg))
                     {
-                        var chat = JsonConvert.DeserializeObject<Chat>(msg);
-                        var senderEmail = chat!.SenderEmail;
-                        var content = chat.Content;
-                        var receiverEmail = chat.ReceiverEmail;
+                        var jsonFile = JsonDocument.Parse(msg);
 
-                        await StartChat(senderEmail!, content!, receiverEmail!);
+                        if (jsonFile.RootElement.ValueKind == JsonValueKind.Array &&
+                            jsonFile.RootElement.GetArrayLength() != 0)
+                        {
+                            var type = jsonFile.RootElement[0].GetProperty("Type").GetString();
+                            if (type == "chat")
+                            {
+                                var chat = JsonConvert.DeserializeObject<Chat>(msg);
+                                var senderEmail = chat!.SenderEmail;
+                                var content = chat.Content;
+                                var receiverEmail = chat.ReceiverEmail;
+                                var sentTime = chat.SendingTime;
+                                await StartChat(senderEmail!, content!, receiverEmail!, sentTime);
+
+                            }
+                            else if (type == "message")
+                            {
+                                var messages = JsonConvert.DeserializeObject<List<Message>>(msg)!;
+                                await MessageToDB(messages);
+                            }
+                        }
+                        else if (jsonFile.RootElement.ValueKind == JsonValueKind.Object)
+                        {
+                            var type = jsonFile.RootElement.GetProperty("Type").GetString();
+                            if (type == "chat")
+                            {
+                                var chat = JsonConvert.DeserializeObject<Chat>(msg);
+                                var senderEmail = chat!.SenderEmail;
+                                var content = chat.Content;
+                                var receiverEmail = chat.ReceiverEmail;
+                                var sentTime = chat.SendingTime;
+                                await StartChat(senderEmail!, content!, receiverEmail!, sentTime);
+
+                            }
+                            else if (type == "message")
+                            {
+                                var messages = JsonConvert.DeserializeObject<List<Message>>(msg)!;
+                                await MessageToDB(messages);
+                            }
+                        }
                     }
                     else if (msg == "_users")
                     {
@@ -131,8 +171,35 @@ namespace MiniChattingApp.Helpers
                         json = JsonConvert.SerializeObject(messages);
                         bw.Write(json);
                     }
-                    Console.ResetColor();
-                    Console.WriteLine(msg);
+                    else if (msg == "--file")
+                    {
+                        try
+                        {
+                            var address = br.ReadString().Split("\n");
+                            var senderEmail = address[0];
+                            var receiverId = int.Parse(address[1]);
+                            await StartFile(tcpClient, email, receiverId);
+                        }
+                        catch (Exception ex)
+                        {
+
+                            ex.Message.ShowErrorMessage();
+                        }
+                    }
+                    else if (msg == "_allFiles")
+                    {
+                        FileMessages = await FileMessageDal!.GetAllAsync();
+                        json = JsonConvert.SerializeObject(FileMessages);
+                        bw.Write(json);
+                    }
+                    else if (msg.StartsWith("_fileID:"))
+                    {
+                        var fileId = int.Parse(msg.Split(":")[1]);
+                        var file = await FileMessageDal!.GetAsync(u => u.Id == fileId);
+                       await SendFile(tcpClient, file!.Path!);
+                    }
+                    //Console.ResetColor();
+                    //Console.WriteLine(msg);
                 }
             }
             catch (Exception ex)
@@ -156,7 +223,142 @@ namespace MiniChattingApp.Helpers
             }
         }
 
-        private static async Task StartChat(string senderEmail, string content, string receiverEmail)
+        private static async Task SendFile(TcpClient tcpClient, string filePath)
+        {
+           
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                Console.WriteLine("File not found");
+                return;
+            }
+
+            string fileName = Path.GetFileName(filePath);
+            long fileSize = new FileInfo(filePath).Length;
+
+            var stream = tcpClient.GetStream();
+
+            byte[] fileNameBytes = Encoding.UTF8.GetBytes(fileName);// name to bytes
+            byte[] fileNameLengthBytes = BitConverter.GetBytes(fileNameBytes.Length);//name.Length to bytes
+
+            await stream.WriteAsync(fileNameLengthBytes);
+            await stream.WriteAsync(fileNameBytes);
+
+
+            byte[] fileSizeBytes = BitConverter.GetBytes(fileSize);
+            await stream.WriteAsync(fileSizeBytes);
+
+            byte[] buffer = new byte[8192];
+            long totalSent = 0;
+
+            await using var fileStream = new FileStream(
+                filePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 8192,
+                useAsync: true
+                );
+
+            int read;
+
+            while ((read = await fileStream.ReadAsync(buffer)) > 0)
+            {
+                await stream.WriteAsync(buffer.AsMemory(0, read));
+                totalSent += read;
+            }
+
+            Console.WriteLine("File sent successfully");
+        }
+
+        private static async Task StartFile(TcpClient tcpClient, string myEmail, int receiverId)
+        {
+            var senderUser = await UserDal!.GetAsync(u => u.Email == myEmail);
+            var receiverUser = await UserDal.GetAsync(u => u.Id == receiverId);
+
+            Directory.CreateDirectory(SaveFolder);
+            var stream = tcpClient.GetStream();
+
+            //1. Read filename len
+
+            byte[] fileNameLengthBuffer = new byte[4];
+            await stream.ReadExactlyAsync(fileNameLengthBuffer, 0, 4);
+            int length = BitConverter.ToInt32(fileNameLengthBuffer, 0);
+            int fileNameLength = BitConverter.ToInt32(fileNameLengthBuffer, 0);
+
+            //2. Read filename
+            byte[] fileNameBuffer = new byte[fileNameLength];
+            await stream.ReadExactlyAsync(fileNameBuffer, 0, fileNameLength);
+
+            string fileName = Encoding.UTF8.GetString(fileNameBuffer);
+
+            fileName = Path.GetFileName(fileName);
+
+            //3. Read file size - long 8 byte
+
+            byte[] fileSizeBuffer = new byte[8];
+            await stream.ReadExactlyAsync(fileSizeBuffer, 0, 8);
+
+            long fileSize = BitConverter.ToInt64(fileSizeBuffer, 0);
+
+            Console.WriteLine($"Receiving file: {fileName}");
+            Console.WriteLine($"File size: {fileSize} bytes");
+
+            string savePath = Path.Combine(SaveFolder, fileName);
+
+            //4. Read file bytes and save
+            byte[] buffer = new byte[8192];
+            long totalReceived = 0;
+
+            await using var fileStream = new FileStream(
+                savePath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 8192,
+                useAsync: true
+                );
+            while (totalReceived < fileSize)
+            {
+                int bytesToRead = (int)Math.Min(buffer.Length, fileSize - totalReceived);
+
+                int received = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead));
+
+                if (received == 0)
+                {
+                    throw new IOException("Client disconnected before file transfer completion");
+                }
+
+                await fileStream.WriteAsync(buffer.AsMemory(0, received));
+
+                totalReceived += received;
+
+                double progress = totalReceived * 100 / fileSize;
+
+                Console.WriteLine($"Progress : {progress:F2}%");
+            }
+            Console.WriteLine($"File saved:{savePath}");
+
+            var fileMessage = new FileMessage
+            {
+                Path = savePath,
+                ReceiverId = receiverId,
+                SenderId = senderUser.Id
+            };
+            await FileMessageDal!.AddAsync(fileMessage);
+        }
+
+        public static async Task MessageToDB(List<Message> messages)
+        {
+            foreach (var entity in messages)
+            {
+                await Program.dbContext.Messages
+                    .Where(m => m.Id == entity.Id)
+                    .ExecuteUpdateAsync(e =>
+                    e.SetProperty(m => m.IsRead, entity.IsRead));
+            }
+        }
+
+        private static async Task StartChat(string senderEmail, string content, string receiverEmail, DateTime sentTime)
         {
             var receiverUser = await UserDal!.GetAsync(u => u.Email == receiverEmail);
             var senderUser = await UserDal!.GetAsync(u => u.Email == senderEmail);
@@ -171,7 +373,8 @@ namespace MiniChattingApp.Helpers
                 Content = content,
                 SenderId = senderUser!.Id,
                 ReceiverId = receiverUser.Id,
-                IsRead = false
+                IsRead = false,
+                SentTime = sentTime
             };
             await MessageDal!.AddAsync(message);
             if (receiverClient != null)

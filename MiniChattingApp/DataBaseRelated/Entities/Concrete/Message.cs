@@ -21,5 +21,7 @@ namespace MiniChattingApp.DataBaseRelated.Entities.Concrete
         public int ReceiverId { get; set; }
         public virtual User? Receiver { get; set; }
 
+        public DateTime? SentTime { get; set; }
+
     }
 }

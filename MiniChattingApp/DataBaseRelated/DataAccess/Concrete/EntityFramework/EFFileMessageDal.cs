@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace MiniChattingApp.DataBaseRelated.DataAccess.Concrete.EntityFramework
 {
-    internal class EFFileMessageDal : EntityFrameworkBase<FileMessage,MiniChattingDBContext>,
+    public class EFFileMessageDal : EntityFrameworkBase<FileMessage,MiniChattingDBContext>,
         IFileMessageDal
     {
         public EFFileMessageDal(MiniChattingDBContext dBContext) : base(dBContext)

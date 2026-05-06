@@ -17,13 +17,13 @@ namespace MiniChattingApp
             var admin = new User { Email = "11@gm.com", Username = "admin" };
             await userDal.AddAsync(admin);
         }
+        public static MiniChattingDBContext dbContext = new MiniChattingDBContext();
         static async Task Main(string[] args)
         {
             JsonConvert.DefaultSettings = () => new JsonSerializerSettings
             {
                 ReferenceLoopHandling = ReferenceLoopHandling.Ignore
             };
-            using var dbContext = new MiniChattingDBContext();
             var userDal = new EFUserDal(dbContext);
             var userService = new UserService(userDal);
 
@@ -38,8 +38,9 @@ namespace MiniChattingApp
             Chatting.UserService = userService;
             Chatting.UserDal = userDal;
             Chatting.MessageDal = messageDal;
+            Chatting.FileMessageDal = fileMessageDal;
             await Chatting.Initiate();
-            
+
         }
     }
 }
