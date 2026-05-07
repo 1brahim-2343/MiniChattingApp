@@ -30,5 +30,12 @@ namespace MiniChattingApp.DataBaseRelated.DataAccess.Concrete.EntityFramework
             return (_context.SaveChanges()) > 0;
 
         }
+
+        public async Task<bool> UpdateUserVerificationStatusAsync(int id)
+        {
+            var user = await GetAsync(u => u.Id == id);
+            user!.IsVerified = true;
+            return (_context.SaveChanges()) > 0;
+        }
     }
 }

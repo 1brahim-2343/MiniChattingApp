@@ -11,5 +11,6 @@ namespace MiniChattingApp.DataBaseRelated.DataAccess.Abstraction
     public interface IUserDal:IEntityRepository<User>
     {
         Task<bool> UpdateUserStatusAsync(int id, bool isOnline);
+        Task<bool> UpdateUserVerificationStatusAsync(int id);
     }
 }

@@ -6,6 +6,7 @@ using MiniChattingApp.DataBaseRelated.Service.Concrete;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -42,6 +43,7 @@ namespace MiniChattingApp.Helpers
 
         public static async Task Initiate()
         {
+
             try
             {
                 Users = await UserDal!.GetAllAsync();
@@ -156,12 +158,16 @@ namespace MiniChattingApp.Helpers
                                 var messages = JsonConvert.DeserializeObject<List<Message>>(msg)!;
                                 await MessageToDB(messages);
                             }
+                            else if (type == "user")
+                            {
+                                var jsonUser = JsonConvert.DeserializeObject<User>(msg)!;
+                                await UserDal.UpdateUserVerificationStatusAsync(jsonUser.Id);
+                            }
                         }
                     }
                     else if (msg == "_users")
                     {
                         Users = await UserDal.GetAllAsync();
-                        bw = new BinaryWriter(stream);
                         json = JsonConvert.SerializeObject(Users);
                         bw.Write(json);
                     }
@@ -196,7 +202,20 @@ namespace MiniChattingApp.Helpers
                     {
                         var fileId = int.Parse(msg.Split(":")[1]);
                         var file = await FileMessageDal!.GetAsync(u => u.Id == fileId);
-                       await SendFile(tcpClient, file!.Path!);
+                        await SendFile(tcpClient, file!.Path!);
+                    }
+                    else if (msg == "--voice")
+                    {
+                        var fileInfo = br.ReadString().Split("\n");
+                        var fileName = fileInfo[0] + "_" + fileInfo[1];
+                        var senderEmail = fileInfo[1];
+                        var receiverId = int.Parse(fileInfo[2]);
+                        var fileSize = br.ReadInt64();
+
+                        if (fileSize == 0) break;
+
+                        var bytesFile = br.ReadBytes((int)fileSize);
+                        await SaveFileAsync(fileName, senderEmail, receiverId, bytesFile);
                     }
                     //Console.ResetColor();
                     //Console.WriteLine(msg);
@@ -223,9 +242,29 @@ namespace MiniChattingApp.Helpers
             }
         }
 
+        private static async Task SaveFileAsync(string fileName, string myEmail, int receiverId, byte[] bytesFile)
+        {
+            var senderUser = await UserDal!.GetAsync(u => u.Email == myEmail);
+            var receiverUser = await UserDal.GetAsync(u => u.Id == receiverId);
+
+            var savePath = $"Records\\{fileName}.wav";
+            Directory.CreateDirectory("Records");
+
+            await File.WriteAllBytesAsync(savePath, bytesFile);
+
+            var fileMessage = new FileMessage
+            {
+                Path = savePath,
+                ReceiverId = receiverId,
+                SenderId = senderUser.Id
+            };
+            await FileMessageDal!.AddAsync(fileMessage);
+
+        }
+
         private static async Task SendFile(TcpClient tcpClient, string filePath)
         {
-           
+
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
                 Console.WriteLine("File not found");
@@ -236,6 +275,10 @@ namespace MiniChattingApp.Helpers
             long fileSize = new FileInfo(filePath).Length;
 
             var stream = tcpClient.GetStream();
+            var bw = new BinaryWriter(stream);
+            bw.Write("--FileStartReady");
+
+            await Task.Delay(50);
 
             byte[] fileNameBytes = Encoding.UTF8.GetBytes(fileName);// name to bytes
             byte[] fileNameLengthBytes = BitConverter.GetBytes(fileNameBytes.Length);//name.Length to bytes
@@ -432,6 +475,12 @@ namespace MiniChattingApp.Helpers
             }
             else
             {
+                var clientIpAddress = ((IPEndPoint)client.Client.RemoteEndPoint!).Address.ToString();
+                var clientPort = ((IPEndPoint)client.Client.RemoteEndPoint!).Port.ToString();
+
+                existing.IpAddress = clientIpAddress;
+                existing.Port = clientPort;
+                await UserDal!.UpdateAsync(existing);
                 return UserDbStatus.UserIsVerified;
 
             }
